@@ -1,7 +1,6 @@
 // ui.js — الهيكل العام: الترويسة، شريط الأدوات، النوافذ، التنبيهات، الثيم الأبيض/الأسود
 import { icon } from './icons.js';
 import { esc, state, history, storage } from './state.js';
-import { renderBar } from './bar.js';
 import { renderPanel } from './panel.js';
 
 const SIZE_PRESETS = [
@@ -254,6 +253,7 @@ export function initUI(ctx) {
     $('#toasts').appendChild(t);
     setTimeout(() => t.classList.add('out'), ms - 400);
     setTimeout(() => t.remove(), ms);
+    return t;
   }
 
   /* ---------------- التحديث ---------------- */
@@ -268,10 +268,10 @@ export function initUI(ctx) {
     $('#undoBtn').disabled = !history.canUndo(ws);
     $('#redoBtn').disabled = !history.canRedo(ws);
   }
-  function refreshAll() { refreshHeader(); renderBar(ctx); renderPanel(ctx); updateEmpty(); refreshTool(); }
+  function refreshAll() { refreshHeader(); if (ctx.refreshDock) ctx.refreshDock(); renderPanel(ctx); updateEmpty(); refreshTool(); }
 
   return {
-    refreshAll, refreshHeader, refreshBar: () => { renderBar(ctx); updateEmpty(); updateUndoRedo(); },
+    refreshAll, refreshHeader, refreshDock: () => { if (ctx.refreshDock) ctx.refreshDock(); updateEmpty(); updateUndoRedo(); },
     refreshPanel: () => { renderPanel(ctx); }, updateEmpty, updateUndoRedo, refreshTool,
     toast, modal, confirmModal, promptModal, openHelp, openExport, closeModal,
     get boardOpen() { return !board.classList.contains('hidden'); },

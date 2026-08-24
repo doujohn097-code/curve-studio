@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { cardKey, buildCardGeometry } from './geometry.js';
 import { textureKey, renderImageCard, renderTextCard, imageWorldSize, TEX_Q, bumpFonts } from './textures.js';
+import { evalProp, layerVisibleAt } from './anim.js';
 
 export class Stage {
   constructor(canvas, container) {
@@ -27,6 +28,7 @@ export class Stage {
     this.helper = null;
     this.quality = 1;
     this.stageW = 1; this.stageH = 1;
+    this.time = 0; // الزمن الحالي للمخطط الزمني
     this.raycaster = new THREE.Raycaster();
     this._dark = false;
   }
@@ -126,6 +128,8 @@ export class Stage {
       this.meshes.set(el.id, rec);
       this.group.add(mesh);
     }
+    const T = this.time || 0;
+    const ev = prop => evalProp(el, prop, T, ws);
     const tk = textureKey(el, this.quality);
     if (rec.texKey !== tk) {
       const q = TEX_Q * this.quality;
@@ -141,20 +145,21 @@ export class Stage {
       rec.w = out.worldW; rec.h = out.worldH;
       rec.texKey = tk;
     }
-    const gk = cardKey(rec.w, rec.h, el);
+    const evBend = { bendX: ev('bendX'), bendY: ev('bendY'), twist: ev('twist'), waveAmp: ev('waveAmp'), waveCount: el.waveCount };
+    const gk = cardKey(rec.w, rec.h, evBend);
     if (rec.geoKey !== gk) {
       rec.mesh.geometry.dispose();
-      rec.mesh.geometry = buildCardGeometry(rec.w, rec.h, el);
+      rec.mesh.geometry = buildCardGeometry(rec.w, rec.h, evBend);
       rec.geoKey = gk;
     }
     const m = rec.mesh;
     const n = ws.elements.length;
     const zBase = (n - 1 - i) * 8;
-    m.position.set(el.x, el.y, zBase + el.z * 10);
-    m.rotation.set(el.rotX * Math.PI / 180, el.rotY * Math.PI / 180, el.rotZ * Math.PI / 180);
-    m.scale.setScalar(Math.max(0.03, el.scale));
-    m.material.opacity = el.opacity;
-    m.visible = el.visible;
+    m.position.set(ev('x'), ev('y'), zBase + ev('z') * 10);
+    m.rotation.set(ev('rotX') * Math.PI / 180, ev('rotY') * Math.PI / 180, ev('rotZ') * Math.PI / 180);
+    m.scale.setScalar(Math.max(0.03, ev('scale')));
+    m.material.opacity = ev('opacity');
+    m.visible = el.visible && layerVisibleAt(el, T, ws);
     m.renderOrder = i;
     if (this.selectedId === el.id && this.helper && this.helper.visible) this.helper.setFromObject(m);
   }

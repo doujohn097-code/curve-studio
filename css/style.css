@@ -337,3 +337,156 @@ kbd {
   .quickacts { grid-template-columns: 1fr 1fr 40px 40px; }
   #hint { display: none; }
 }
+
+/* ================= المخطط الزمني (بأسلوب After Effects) ================= */
+#dock {
+  direction: ltr;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  height: 262px; min-height: 132px; flex: none;
+}
+#dock.collapsed #tlBody { display: none; }
+#dock.collapsed { height: auto; }
+
+#tlHead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto; scrollbar-width: none; white-space: nowrap;
+}
+#tlHead::-webkit-scrollbar { display: none; }
+.tlgroup { display: flex; align-items: center; gap: 5px; }
+.tlspacer { flex: 1; min-width: 10px; }
+.tlbl { font-size: 10.5px; color: var(--mut); font-weight: 600; }
+.tltime {
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px;
+  min-width: 108px; text-align: center; direction: ltr;
+}
+.tbtn {
+  height: 28px; min-width: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--fg);
+  font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  font-weight: 600;
+}
+.tbtn:hover { border-color: var(--fg); }
+.tbtn.big { font-size: 15px; width: 40px; justify-content: center; }
+.tbtn.on { background: var(--acc); color: var(--acc-fg); border-color: var(--acc); }
+#tlAutoK.on { background: var(--danger); color: #fff; border-color: var(--danger); }
+.tsel { height: 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 11.5px; padding: 0 6px; }
+.tsel.mini { height: 26px; font-size: 11px; }
+.tsel:disabled { opacity: .4; }
+
+#tlBody { flex: 1; overflow: auto; position: relative; }
+#tlInner { position: relative; min-width: 100%; width: max-content; }
+
+.trow { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); position: relative; }
+.trow.ruler { position: sticky; top: 0; z-index: 6; background: var(--bg); height: 26px; }
+.trow.layer:hover .lcol { filter: brightness(0.97); }
+.trow.layer.sel .lcol { box-shadow: inset 3px 0 0 var(--fg); }
+.trow.prop.sel .lcol { box-shadow: inset 3px 0 0 var(--line); }
+
+.lcol {
+  position: sticky; left: 0; z-index: 5;
+  width: 226px; flex: none;
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 8px 0 6px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  direction: rtl;
+  overflow: hidden;
+}
+.lcol.rcol { border-bottom: 1px solid var(--line); }
+.rlbl { font-size: 10px; color: var(--mut); font-weight: 700; white-space: nowrap; }
+.liic { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+.lnm { font-size: 11.5px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow .cb { width: 22px; height: 22px; border-radius: 6px; border: none; background: transparent; color: var(--mut); display: grid; place-items: center; cursor: pointer; padding: 0; flex: none; }
+.trow .cb:hover { color: var(--fg); background: var(--soft); }
+.trow .cb.on { color: var(--fg); }
+.exp { width: 18px; height: 22px; border: none; background: transparent; color: var(--mut); cursor: pointer; font-size: 11px; flex: none; }
+.pcol { padding-left: 24px; background: color-mix(in srgb, var(--bg) 96%, var(--soft)); }
+.pnm { font-size: 10.5px; color: var(--mut); font-weight: 600; }
+.ksw { width: 20px; height: 20px; border: none; border-radius: 50%; background: transparent; color: var(--mut); cursor: pointer; font-size: 11px; flex: none; }
+.ksw.on { color: var(--danger); }
+.kadd { height: 20px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; font-size: 9.5px; padding: 0 4px; flex: none; }
+.kadd:hover { border-color: var(--fg); }
+
+.track { position: relative; flex: none; }
+.rtrack canvas { display: block; cursor: ew-resize; }
+.kline { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--line); }
+
+.lbar {
+  position: absolute; top: 5px; bottom: 5px;
+  background: color-mix(in srgb, var(--fg) 10%, var(--bg));
+  border: 1px solid var(--fg); border-radius: 7px;
+  cursor: grab;
+}
+.lbar.sel { background: color-mix(in srgb, var(--fg) 22%, var(--bg)); }
+.lbar::before, .lbar::after {
+  content: ''; position: absolute; top: 20%; bottom: 20%; width: 4px;
+  background: var(--fg); opacity: .55; border-radius: 2px;
+}
+.lbar::before { left: 2px; } .lbar::after { right: 2px; }
+
+.kfd {
+  position: absolute; top: 50%; width: 11px; height: 11px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--bg); border: 1.6px solid var(--fg);
+  border-radius: 2px; cursor: ew-resize; z-index: 3;
+}
+.kfd:hover { background: var(--fg); }
+.kfd.sel { background: var(--danger); border-color: var(--danger); }
+.kfd.hold { border-style: dashed; }
+.kfmini {
+  position: absolute; top: 50%; width: 7px; height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--mut); border-radius: 1px; pointer-events: none; opacity: .7;
+}
+
+#playhead {
+  position: absolute; top: 0; bottom: 0; width: 1.5px;
+  background: var(--danger);
+  z-index: 7; cursor: ew-resize;
+}
+#playhead .ph-head {
+  position: absolute; top: 0; left: -6px;
+  width: 13px; height: 16px;
+  background: var(--danger);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+}
+.chipsis { font-size: 10.5px; color: var(--mut); }
+
+/* ================= مقابض Gizmo ================= */
+#gizmo .gzh {
+  position: absolute; width: 12px; height: 12px;
+  background: var(--bg);
+  border: 1.7px solid var(--fg);
+  border-radius: 3px;
+  pointer-events: auto;
+  z-index: 8;
+}
+#gizmo .gzh.c { border-radius: 3px; }
+#gizmo .gzh.r { border-radius: 50%; background: var(--fg); }
+#gizmo .gzh.sx, #gizmo .gzh.sy { border-radius: 50%; width: 10px; height: 10px; }
+.gzlabel {
+  position: absolute;
+  background: var(--acc); color: var(--acc-fg);
+  font-size: 10px; font-weight: 700;
+  padding: 1px 8px; border-radius: 999px;
+  transform: translateX(-0px);
+  pointer-events: none; white-space: nowrap;
+}
+html[data-theme='dark'] #gizmo .gzh { border-color: #fff; }
+html[data-theme='dark'] #gizmo .gzh.r { background: #fff; }
+
+/* تكييفات */
+@media (max-width: 920px) {
+  #dock { height: 216px; }
+  .lcol { width: 178px; }
+  .lnm { font-size: 10.5px; }
+  .spd { display: none; }
+  #toasts { bottom: 226px; }
+}
+#dock.collapsed ~ #toasts, body:has(#dock.collapsed) #toasts { bottom: 60px; }

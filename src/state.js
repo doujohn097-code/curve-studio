@@ -42,7 +42,7 @@ export function activeWs() { return state.workspaces.find(w => w.id === state.ac
 export function makeWorkspace(name = 'مشروع جديد') {
   return {
     id: uid('w'), name,
-    w: 1080, h: 1350,
+    w: 1080, h: 1350, duration: 5,
     bg: { type: 'color', color: '#ffffff', from: '#ffffff', to: '#e9e9ec', angle: 135 },
     elements: []
   };
@@ -57,7 +57,7 @@ const baseElement = () => ({
 export function defaultTextElement(n = 1) {
   return {
     ...baseElement(), type: 'text', name: 'نص ' + n,
-    text: 'اكتب نصك هنا', font: 'Cairo', fontSize: 56, weight: 700, italic: false,
+    text: 'اكتب نصك هنا', font: 'Cairo', fontSize: 36, weight: 700, italic: false,
     spacing: 0, lineHeight: 1.25, align: 'center', dir: 'auto',
     color: '#141414', strokeW: 0, strokeColor: '#ffffff', textBg: 'transparent', radius: 30
   };

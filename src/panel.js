@@ -132,7 +132,7 @@ export function renderPanel(ctx) {
       root.querySelector('#pcBendPre').querySelectorAll('button').forEach(b => {
         b.onclick = () => {
           const pr = BEND_PRESETS[+b.dataset.i].p;
-          Object.assign(el, pr);
+          Object.entries(pr).forEach(([pk, pv]) => ctx.setProp(el, pk, pv));
           ctx.touch(el, true);
           ctx.refreshPanel();
         };
@@ -165,7 +165,7 @@ export function renderPanel(ctx) {
     g.push(`<button class="btn wide" id="pcResetT">${icon('rotate')} تصفير التحويلات</button>`);
     binds.push(() => {
       root.querySelector('#pcResetT').onclick = () => {
-        Object.assign(el, { x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 1, opacity: 1 });
+        ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'scale', 'opacity'].forEach(pk => ctx.setProp(el, pk, pk === 'scale' || pk === 'opacity' ? 1 : 0));
         ctx.touch(el, true); ctx.refreshPanel();
       };
     });
@@ -199,7 +199,7 @@ function addRange(parts, binds, el, ctx, label, key, min, max, step, unit = '') 
   parts.push(row(label, `<div class="pair"><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${fmt(el[key])}"><input type="number" class="num" id="${id}n" min="${min}" max="${max}" step="${step}" value="${fmt(el[key])}">${unit ? `<span class="unit">${unit}</span>` : ''}</div>`));
   binds.push(() => {
     const r = document.getElementById(id), n = document.getElementById(id + 'n');
-    const apply = v => { v = clampN(v, min, max); el[key] = v; r.value = v; n.value = Math.round(v * 100) / 100; ctx.touch(el, false); };
+    const apply = v => { v = clampN(v, min, max); ctx.setProp(el, key, v, true); r.value = v; n.value = Math.round(v * 100) / 100; };
     r.addEventListener('input', () => apply(parseFloat(r.value)));
     n.addEventListener('input', () => { const v = parseFloat(n.value); if (!isNaN(v)) apply(v); });
     r.addEventListener('change', () => ctx.touch(el, true));
@@ -220,7 +220,7 @@ function addColor(parts, binds, el, ctx, label, key, allowTransparent) {
   </div>`));
   binds.push(() => {
     const c = document.getElementById(id);
-    c.addEventListener('input', () => { el[key] = c.value; c.disabled = false; ctx.touch(el, false); });
+    c.addEventListener('input', () => { ctx.setProp(el, key, c.value, true); c.disabled = false; });
     c.addEventListener('change', () => ctx.touch(el, true));
     const t = document.getElementById(id + 't');
     if (t) t.onclick = () => {
@@ -234,6 +234,6 @@ function addToggle(parts, binds, el, ctx, label, key) {
   parts.push(row(label, `<button class="btn mini tog" id="${id}" aria-pressed="${!!el[key]}">${el[key] ? 'مفعّل' : 'معطّل'}</button>`));
   binds.push(() => {
     const b = document.getElementById(id);
-    b.onclick = () => { el[key] = !el[key]; b.setAttribute('aria-pressed', !!el[key]); b.textContent = el[key] ? 'مفعّل' : 'معطّل'; ctx.touch(el, true); };
+    b.onclick = () => { ctx.setProp(el, key, !el[key]); b.setAttribute('aria-pressed', !!el[key]); b.textContent = el[key] ? 'مفعّل' : 'معطّل'; ctx.touch(el, true); };
   });
 }

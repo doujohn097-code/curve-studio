@@ -1,6 +1,6 @@
 {
   "name": "curve-studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "استوديو 3D في المتصفح — صورتك كبطاقة/شاشة منحنية قابلة للدوران 360° مع نصوص عربية/إنجليزية وطبقات كاملة | 3D curved image & text studio",
   "main": "index.html",
   "scripts": {

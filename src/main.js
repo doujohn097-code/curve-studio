@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { Stage } from './scene.js';
 import { initUI } from './ui.js';
-import { renderBar } from './bar.js';
+import { initTimeline } from './timeline.js';
+import { Gizmo } from './gizmo.js';
+import { ANIM_PROPS, upsertKey, evalProp } from './anim.js';
 import {
   state, activeWs, assets, addAsset, storage, history, serialize,
   makeWorkspace, defaultTextElement, defaultImageElement, uid, esc
@@ -28,30 +30,52 @@ state.workspaces.forEach(w => history.touch(w));
 let selectedId = null;
 let replaceTarget = null;
 
+let timeline = null, gizmo = null;
+
+/* كتابة خاصية (مع دعم المفاتيح التلقائية للمخطط الزمني) */
+function setProp(el, prop, v, live = false) {
+  const ws = ctx.ws();
+  const hasKeys = !!(el.anim && el.anim.props && el.anim.props[prop] && el.anim.props[prop].k.length);
+  if ((hasKeys || (timeline && timeline.autoKey)) && ANIM_PROPS.has(prop)) {
+    upsertKey(el, prop, Math.round((timeline ? timeline.time : 0) * 30) / 30, v);
+  } else {
+    el[prop] = v;
+  }
+  if (!live) { /* الالتزام يتم من المستدعي عبر touch */ }
+}
+const curVal = (el, prop) => evalProp(el, prop, stage.time, ctx.ws());
+
 const ctx = {
   state, ws: activeWs, get selectedId() { return selectedId; },
   stage, select, touch, addText, pickImages, removeEl, duplicateEl, moveLayer, renameEl,
   newWorkspace, deleteWorkspace, renameWorkspace, switchWorkspace, setWorkspaceSize, setBg,
   undo, redo, doExport, setTool, setTheme, applyTool, applyFrame, fitView,
   replaceImage, importProject, exportProject,
-  refreshPanel: () => ui.refreshPanel()
+  refreshPanel: () => ui.refreshPanel(),
+  setProp, curVal,
+  refreshDock: () => { if (timeline) timeline.refresh(); },
+  isPlaying: () => !!(timeline && timeline.playing),
+  exportVideo,
+  scheduleSavePub: () => scheduleSave(),
+  get timeline() { return timeline; }
 };
 
 const ui = initUI(ctx);
+function refreshDockAll() { if (timeline) timeline.refresh(); ui.updateEmpty(); }
 window.__ctx = ctx; // للتنقيح
 
 /* ============ عمليات العناصر ============ */
 function select(id) {
   selectedId = id;
   stage.setSelection(id);
-  renderBar(ctx);
+  if (timeline) timeline.refresh();
   ui.refreshPanel();
 }
 function touch(el, commit) {
   if (commit) {
     history.commit(ctx.ws());
     scheduleSave();
-    ui.refreshBar();
+    if (timeline) timeline.refresh();
     ui.updateUndoRedo();
   }
 }
@@ -63,7 +87,7 @@ function addText() {
   ws.elements.unshift(el);
   history.commit(ws);
   select(el.id);
-  scheduleSave(); ui.refreshAll ? ui.refreshAll() : ui.refreshBar();
+  scheduleSave(); if (ui.refreshAll) ui.refreshAll();
   ui.updateEmpty();
   ui.toast('أُضيف نص — عدّله من لوحة الخصائص');
   if (window.innerWidth < 900) document.body.classList.add('panel-open');
@@ -86,7 +110,7 @@ function addImageFiles(files) {
       if (added === imgs.length) {
         history.commit(ws);
         select(lastEl.id);
-        scheduleSave(); ui.refreshBar(); ui.updateEmpty();
+        scheduleSave(); refreshDockAll();
         ui.toast('أُضيفت الصورة — اسحبها أو اضغط عليها لتعديلها');
         if (window.innerWidth < 900) document.body.classList.add('panel-open');
       }
@@ -101,7 +125,7 @@ function removeEl(id) {
   ws.elements.splice(i, 1);
   if (selectedId === id) select(null);
   history.commit(ws);
-  scheduleSave(); ui.refreshBar(); ui.updateEmpty();
+  scheduleSave(); refreshDockAll();
   ui.toast('حُذف العنصر — Ctrl+Z للتراجع');
 }
 function duplicateEl(id) {
@@ -114,7 +138,7 @@ function duplicateEl(id) {
   ws.elements.splice(i, 0, copy);
   history.commit(ws);
   select(copy.id);
-  scheduleSave(); ui.refreshBar();
+  scheduleSave(); refreshDockAll();
 }
 function moveLayer(id, target, mode) {
   const ws = ctx.ws();
@@ -129,13 +153,13 @@ function moveLayer(id, target, mode) {
   const [el] = ws.elements.splice(i, 1);
   ws.elements.splice(to, 0, el);
   history.commit(ws);
-  scheduleSave(); ui.refreshBar();
+  scheduleSave(); refreshDockAll();
 }
 function renameEl(id) {
   const ws = ctx.ws();
   const el = ws.elements.find(e => e.id === id);
   if (!el) return;
-  ui.promptModal('إعادة تسمية العنصر', 'الاسم', el.name, v => { el.name = v; history.commit(ws); scheduleSave(); ui.refreshBar(); });
+  ui.promptModal('إعادة تسمية العنصر', 'الاسم', el.name, v => { el.name = v; history.commit(ws); scheduleSave(); refreshDockAll(); });
 }
 function replaceImage(id) { replaceTarget = id; fileInput.value = ''; fileInput.click(); }
 
@@ -147,7 +171,7 @@ fileInput.addEventListener('change', () => {
       rd.onload = () => {
         const ws = ctx.ws();
         const el = ws.elements.find(e => e.id === replaceTarget);
-        if (el) { el.assetId = addAsset(rd.result); history.commit(ws); scheduleSave(); ui.refreshBar(); ui.toast('تم استبدال الصورة'); }
+        if (el) { el.assetId = addAsset(rd.result); history.commit(ws); scheduleSave(); refreshDockAll(); ui.toast('تم استبدال الصورة'); }
       };
       rd.readAsDataURL(f);
     }
@@ -269,6 +293,104 @@ function importProject() {
   inp.click();
 }
 
+
+/* ============ تصدير فيديو WebM (بمعدل 30 إطاراً/ث وبزمن حقيقي) ============ */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function exportVideo() {
+  const ws = ctx.ws();
+  if (!('MediaRecorder' in window) || !HTMLCanvasElement.prototype.captureStream) {
+    ui.toast('المتصفح لا يدعم تصدير الفيديو — استخدم حفظ الصورة PNG');
+    return;
+  }
+  const W = ws.w, H = ws.h;
+  const comp = document.createElement('canvas');
+  comp.width = W; comp.height = H;
+  const c2 = comp.getContext('2d');
+  const canReq = typeof comp.captureStream === 'function';
+  const stream = comp.captureStream(canReq ? 0 : 30);
+  const track = stream.getVideoTracks()[0];
+  let mime = 'video/webm;codecs=vp9';
+  if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+  if (!MediaRecorder.isTypeSupported(mime)) { ui.toast('المتصفح لا يدعم WebM'); return; }
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const done = new Promise(r => { rec.onstop = r; });
+
+  const prevSel = selectedId;
+  select(null);
+  const wasPlaying = timeline.playing;
+  timeline.setPlaying(false);
+  const prevTime = timeline.time;
+
+  const pr = stage.renderer.getPixelRatio();
+  const camA = stage.camera.aspect;
+  stage.renderer.setPixelRatio(1);
+  stage.renderer.setSize(W, H, false);
+  stage.camera.aspect = W / H;
+  stage.camera.updateProjectionMatrix();
+
+  const fillBg = () => {
+    if (ws.bg.type === 'color') c2.fillStyle = ws.bg.color;
+    else if (ws.bg.type === 'gradient') {
+      const a = ((ws.bg.angle || 135) - 90) * Math.PI / 180;
+      const cx = W / 2, cy = H / 2, len = Math.abs(W * Math.cos(a)) + Math.abs(H * Math.sin(a));
+      const g = c2.createLinearGradient(cx - Math.cos(a) * len / 2, cy - Math.sin(a) * len / 2, cx + Math.cos(a) * len / 2, cy + Math.sin(a) * len / 2);
+      g.addColorStop(0, ws.bg.from); g.addColorStop(1, ws.bg.to);
+      c2.fillStyle = g;
+    } else c2.fillStyle = '#ffffff';
+    c2.fillRect(0, 0, W, H);
+  };
+
+  const fps = 30, dt = 1 / fps;
+  const dur = ws.duration;
+  const toastEl = ui.toast('⏺ جاري تصدير الفيديو… 0%', (dur + 4) * 1000);
+
+  rec.start(250);
+  const t0 = performance.now();
+  let f = 0;
+  try {
+    for (; f / fps <= dur + 1e-6; f++) {
+      const t = Math.min(f * dt, dur);
+      stage.time = t;
+      stage.syncAll(ws);
+      stage.render();
+      fillBg();
+      c2.drawImage(stage.renderer.domElement, 0, 0, W, H);
+      if (canReq && track.requestFrame) track.requestFrame();
+      if (toastEl && f % 10 === 0) toastEl.textContent = '⏺ جاري تصدير الفيديو… ' + Math.round(t / dur * 100) + '%';
+      const target = t0 + ((f + 1) * 1000 / fps);
+      await sleep(Math.max(0, target - performance.now()));
+    }
+  } catch (err) {
+    ui.toast('خطأ أثناء التصدير: ' + err.message);
+  }
+  rec.stop();
+  await done;
+
+  stage.renderer.setPixelRatio(pr);
+  stage.resize(stage.stageW, stage.stageH);
+  stage.camera.aspect = camA;
+  stage.camera.updateProjectionMatrix();
+  timeline.setTime(prevTime);
+  if (wasPlaying) timeline.setPlaying(true);
+  if (prevSel) select(prevSel);
+  if (toastEl) toastEl.remove();
+
+  const blob = new Blob(chunks, { type: mime });
+  const url = URL.createObjectURL(blob);
+  const name = (ws.name || 'design') + '-' + W + 'x' + H + '.webm';
+  ui.modal({
+    title: 'الفيديو جاهز — ' + (blob.size / 1048576).toFixed(1) + 'MB', wide: true,
+    body: `<div class="exwrap"><video src="${url}" controls style="max-width:100%;max-height:46dvh;border-radius:8px;background:#000"></video>
+      <p class="mini-h">صيغة WebM (${W}×${H} · ${dur.toFixed(1)}ث · 30fps) — تعمل في كل المتصفحات والمواقع، ويمكن تحويلها MP4 بأي أداة.</p></div>`,
+    buttons: [
+      { label: 'إغلاق', onClick: c => { c(); URL.revokeObjectURL(url); } },
+      { label: 'تنزيل الفيديو', primary: true, onClick: () => { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); } }
+    ]
+  });
+}
+
 /* ============ الأدوات والثيم والإطار ============ */
 function setTool(t) { state.ui.tool = t; ui.refreshTool(); }
 function applyTool() {
@@ -318,6 +440,7 @@ let pinch0 = null; // {dist, ang, scale, rotZ}
 function hitEl(cx, cy) { return stage.raycast(ctx.ws(), cx, cy); }
 
 stageEl.addEventListener('pointerdown', e => {
+  if (e.target !== canvas) return; // مقابض Gizmo والأزرار تدير نفسها
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   downAt = { x: e.clientX, y: e.clientY, t: Date.now() };
   dragMoved = false;
@@ -348,7 +471,7 @@ stageEl.addEventListener('pointerdown', e => {
     select(el.id);
     const zWorld = stage.meshes.get(el.id) ? stage.meshes.get(el.id).mesh.position.z : 0;
     const pt = stage.planePoint(e.clientX, e.clientY, zWorld);
-    if (pt) dragOff.set(el.x - pt.x, el.y - pt.y, 0);
+    if (pt) dragOff.set(curVal(el, 'x') - pt.x, curVal(el, 'y') - pt.y, 0);
     dragEl = el;
   } else {
     dragEl = null;
@@ -372,8 +495,8 @@ stageEl.addEventListener('pointermove', e => {
     if (!el) return;
     const d = Math.hypot(p2.x - p1.x, p2.y - p1.y);
     const a = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
-    el.scale = Math.max(0.05, Math.min(4, pinch0.scale * (d / pinch0.dist)));
-    el.rotZ = pinch0.rotZ + (a - pinch0.ang);
+    setProp(el, 'scale', Math.max(0.05, Math.min(4, pinch0.scale * (d / pinch0.dist))), true);
+    setProp(el, 'rotZ', Math.round((pinch0.rotZ + (a - pinch0.ang)) * 10) / 10, true);
     return;
   }
   if (dragEl && pointers.size === 1) {
@@ -381,8 +504,8 @@ stageEl.addEventListener('pointermove', e => {
     const zWorld = stage.meshes.get(dragEl.id) ? stage.meshes.get(dragEl.id).mesh.position.z : 0;
     const pt = stage.planePoint(e.clientX, e.clientY, zWorld);
     if (pt) {
-      dragEl.x = Math.round((pt.x + dragOff.x) * 10) / 10;
-      dragEl.y = Math.round((pt.y + dragOff.y) * 10) / 10;
+      setProp(dragEl, 'x', Math.round((pt.x + dragOff.x) * 10) / 10, true);
+      setProp(dragEl, 'y', Math.round((pt.y + dragOff.y) * 10) / 10, true);
     }
   }
 }, true);
@@ -422,7 +545,7 @@ stageEl.addEventListener('wheel', e => {
   const el = ctx.ws().elements.find(x => x.id === selectedId);
   if (e.ctrlKey && el && state.ui.tool === 'move') {
     e.preventDefault(); e.stopPropagation();
-    el.scale = Math.max(0.05, Math.min(4, el.scale * (e.deltaY < 0 ? 1.07 : 0.93)));
+    setProp(el, 'scale', Math.max(0.05, Math.min(4, curVal(el, 'scale') * (e.deltaY < 0 ? 1.07 : 0.93))));
     history.commit(ctx.ws()); scheduleSave(); ui.refreshPanel();
   }
 }, { passive: false, capture: true });
@@ -477,21 +600,31 @@ document.addEventListener('keydown', e => {
   if (k.toLowerCase() === 't') { addText(); return; }
   if (k.toLowerCase() === 'i') { pickImages(); return; }
 
+  if (k === ' ') { e.preventDefault(); timeline && timeline.setPlaying(!timeline.playing); return; }
+  if (k === 'Home') { timeline && (timeline.setPlaying(false), timeline.setTime(0)); return; }
+  if (k === 'End') { timeline && (timeline.setPlaying(false), timeline.setTime(ws.duration)); return; }
+  if ((k === 'ArrowLeft' || k === 'ArrowRight') && !el && timeline) {
+    e.preventDefault();
+    timeline.setTime(timeline.time + (k === 'ArrowRight' ? 1 : -1) / 30);
+    return;
+  }
+  if (k === 'Delete' && timeline && timeline.selKf) { timeline.deleteSelKf(); return; }
   if (!el) return;
+  const sp = (prop, v) => setProp(el, prop, Math.round(v * 100) / 100);
   const step = e.shiftKey ? 8 : 1.5;
-  if (k === 'ArrowLeft') { e.preventDefault(); el.x -= step; }
-  else if (k === 'ArrowRight') { e.preventDefault(); el.x += step; }
-  else if (k === 'ArrowUp') { e.preventDefault(); el.y += step; }
-  else if (k === 'ArrowDown') { e.preventDefault(); el.y -= step; }
-  else if (k.toLowerCase() === 'q') { el.rotZ -= 4; }
-  else if (k.toLowerCase() === 'e') { el.rotZ += 4; }
-  else if (k.toLowerCase() === 'w') { el.rotX -= 4; }
-  else if (k.toLowerCase() === 's') { el.rotX += 4; }
-  else if (k.toLowerCase() === 'a') { el.rotY -= 4; }
-  else if (k.toLowerCase() === 'd') { el.rotY += 4; }
-  else if (k === '+' || k === '=') { el.scale = Math.min(4, el.scale * 1.06); }
-  else if (k === '-' || k === '_') { el.scale = Math.max(0.05, el.scale * 0.94); }
-  else if (k.toLowerCase() === 'r') { el.rotX = el.rotY = el.rotZ = 0; }
+  if (k === 'ArrowLeft') { e.preventDefault(); sp('x', curVal(el, 'x') - step); }
+  else if (k === 'ArrowRight') { e.preventDefault(); sp('x', curVal(el, 'x') + step); }
+  else if (k === 'ArrowUp') { e.preventDefault(); sp('y', curVal(el, 'y') + step); }
+  else if (k === 'ArrowDown') { e.preventDefault(); sp('y', curVal(el, 'y') - step); }
+  else if (k.toLowerCase() === 'q') { sp('rotZ', curVal(el, 'rotZ') - 4); }
+  else if (k.toLowerCase() === 'e') { sp('rotZ', curVal(el, 'rotZ') + 4); }
+  else if (k.toLowerCase() === 'w') { sp('rotX', curVal(el, 'rotX') - 4); }
+  else if (k.toLowerCase() === 's') { sp('rotX', curVal(el, 'rotX') + 4); }
+  else if (k.toLowerCase() === 'a') { sp('rotY', curVal(el, 'rotY') - 4); }
+  else if (k.toLowerCase() === 'd') { sp('rotY', curVal(el, 'rotY') + 4); }
+  else if (k === '+' || k === '=') { sp('scale', Math.min(4, curVal(el, 'scale') * 1.06)); }
+  else if (k === '-' || k === '_') { sp('scale', Math.max(0.05, curVal(el, 'scale') * 0.94)); }
+  else if (k.toLowerCase() === 'r') { sp('rotX', 0); sp('rotY', 0); sp('rotZ', 0); }
   else return;
   history.commit(ws); scheduleSave();
 });
@@ -508,18 +641,27 @@ ro.observe(stageEl);
 document.addEventListener('click', () => { if (ui.boardOpen) ui.closeBoard(); });
 
 /* ============ الحلقة الرئيسية ============ */
+let lastT = performance.now();
 function loop() {
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+  lastT = now;
+  if (timeline) timeline.tick(dt);
   stage.syncAll(ctx.ws());
   stage.render();
+  if (gizmo) gizmo.update(ctx.ws());
   requestAnimationFrame(loop);
 }
 
 /* ============ تشغيل ============ */
 document.documentElement.dataset.theme = state.ui.theme || 'light';
 stage.setTheme((state.ui.theme || 'light') === 'dark');
+timeline = initTimeline(ctx);
+gizmo = new Gizmo(stageEl, ctx);
 applyTool();
 ui.refreshAll();
 applyFrame();
+stage.time = timeline.time;
 {
   const r = stageEl.getBoundingClientRect();
   stage.resize(Math.max(1, r.width), Math.max(1, r.height));

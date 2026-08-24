@@ -1,4 +1,4 @@
-// tools/smoke.mjs — اختبار آلي شامل + لقطات شاشة
+// tools/smoke.mjs — اختبار آلي شامل + لقطات شاشة (نسخة المخطط الزمني)
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -26,7 +26,6 @@ const step = async (name, fn) => {
   catch (e) { console.log('✘', name, '→', e.message.split('\n')[0]); errors.push('[' + name + '] ' + e.message); }
 };
 
-// صورة اختبار
 await step('توليد صورة اختبار', async () => {
   const dataUrl = await page.evaluate(() => {
     const c = document.createElement('canvas'); c.width = 900; c.height = 1200;
@@ -42,47 +41,138 @@ await step('توليد صورة اختبار', async () => {
   fs.writeFileSync('/tmp/test-img.png', Buffer.from(dataUrl.split(',')[1], 'base64'));
 });
 
-await step('الحالة الفارغة ظاهرة', async () => {
+await step('الحالة الفارغة', async () => {
   await page.waitForSelector('#empty:not(.hidden)', { timeout: 5000 });
   await page.screenshot({ path: shots + 'shot-1-empty.png' });
 });
 
 await step('إضافة نص', async () => {
   await page.click('#eTxt');
-  await page.waitForSelector('.chip', { timeout: 5000 });
+  await page.waitForSelector('.trow.layer[data-id]', { timeout: 5000 });
 });
 
-await step('كتابة نص عربي وتغيير الخط', async () => {
+await step('كتابة نص وتغيير الخط', async () => {
   await page.fill('#panel textarea', 'مرحبا بالعالم\nHello 3D');
-  const select = await page.$('#pcFont');
-  await select.selectOption('Amiri');
+  await page.selectOption('#pcFont', 'Amiri');
   await page.waitForTimeout(600);
 });
 
-await step('إضافة صورة عبر حقل الملف', async () => {
+await step('إضافة صورة', async () => {
   await page.setInputFiles('#fileInput', '/tmp/test-img.png');
   await page.waitForTimeout(1200);
-  const chips = await page.$$eval('.chip', els => els.length);
-  if (chips !== 2) throw new Error('عدد الشرائح ' + chips + ' متوقع 2');
+  const rows = await page.$$eval('.trow.layer[data-id]', els => els.length);
+  if (rows !== 2) throw new Error('عدد الصفوف ' + rows + ' متوقع 2');
 });
 
-await step('تحديد الصورة بالنقر على شريطها', async () => {
-  await page.click('.chip[data-i="0"]');
+await step('تحديد الصورة من المخطط الزمني', async () => {
+  await page.click('.trow.layer[data-id] >> nth=0');
   await page.waitForTimeout(400);
 });
 
-await step('تطبيق انحناء قوي + إطار مستدير', async () => {
-  await page.click('#pcBendPre button:nth-child(4)'); // نصف لفة
+await step('انحناء نصف لفة', async () => {
+  await page.click('#pcBendPre button:nth-child(4)');
   await page.waitForTimeout(300);
   await page.screenshot({ path: shots + 'shot-2-roll.png' });
 });
 
-await step('دوران 360 بالسحب على الخلفية', async () => {
-  await page.mouse.move(200, 450);
+await step('مقابض Gizmo ظاهرة (9 مقابض)', async () => {
+  await page.waitForTimeout(300);
+  const n = await page.$$eval('#gizmo .gzh', els => els.length);
+  if (n !== 9) throw new Error('المقابض ' + n);
+});
+
+await step('تكبير بمقبض الزاوية من الواجهة', async () => {
+  // حدد عنصر النص (غير ملتف) واسحب المقبض شعاعياً بعيداً عن المركز
+  await page.click('.trow.layer[data-id] >> nth=1');
+  await page.waitForTimeout(400);
+  const before = await page.evaluate(() => window.__ctx.curVal(window.__ctx.ws().elements[1], 'scale'));
+  const info = await page.evaluate(() => {
+    const hs = [...document.querySelectorAll('#gizmo .gzh.c')].map(h => { const r = h.getBoundingClientRect(); return [r.x + 6, r.y + 6]; });
+    const cx = (Math.min(...hs.map(p => p[0])) + Math.max(...hs.map(p => p[0]))) / 2;
+    const cy = (Math.min(...hs.map(p => p[1])) + Math.max(...hs.map(p => p[1]))) / 2;
+    return { nw: hs[0], cx, cy };
+  });
+  const [hx, hy] = info.nw;
+  const dx = hx - info.cx, dy = hy - info.cy;
+  await page.mouse.move(hx, hy);
   await page.mouse.down();
-  await page.mouse.move(1100, 300, { steps: 25 });
+  const tx = hx + dx * 0.45, ty = Math.max(14, hy + dy * 0.45);
+  await page.mouse.move(tx, ty, { steps: 12 });
   await page.mouse.up();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => window.__ctx.curVal(window.__ctx.ws().elements[1], 'scale'));
+  if (!(after > before + 0.08)) throw new Error('التكبير لم يعمل: ' + before + '→' + after);
+  // عد إلى تحديد الصورة
+  await page.click('.trow.layer[data-id] >> nth=0');
+  await page.waitForTimeout(300);
+});
+
+await step('تشغيل المفاتيح التلقائية وإنشاء مفتاح بالسحب', async () => {
+  await page.click('#tlAutoK');
+  const info = await page.evaluate(() => {
+    const hs = [...document.querySelectorAll('#gizmo .gzh.c')].map(h => { const r = h.getBoundingClientRect(); return [r.x + 6, r.y + 6]; });
+    const cx = (Math.min(...hs.map(p => p[0])) + Math.max(...hs.map(p => p[0]))) / 2;
+    const cy = (Math.min(...hs.map(p => p[1])) + Math.max(...hs.map(p => p[1]))) / 2;
+    return { nw: hs[0], cx, cy };
+  });
+  const [hx, hy] = info.nw;
+  const dx = hx - info.cx, dy = hy - info.cy;
+  await page.mouse.move(hx, hy);
+  await page.mouse.down();
+  await page.mouse.move(hx - dx * 0.2, hy - dy * 0.2, { steps: 8 }); // نحو الداخل = تصغير
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const k = await page.evaluate(() => (window.__ctx.ws().elements[0].anim?.props?.scale?.k || []).length);
+  if (k < 1) throw new Error('لم يُنشأ مفتاح');
+  await page.click('#tlAutoK');
+});
+
+await step('توسيع الطبقة وإضافة مفتاح موضع', async () => {
+  await page.click('.trow.layer[data-id] .exp >> nth=0');
+  await page.waitForTimeout(300);
+  await page.click('.kadd >> nth=0');
+  await page.waitForTimeout(300);
+  const n = await page.$$eval('.kfd', els => els.length);
+  if (n < 1) throw new Error('لا مفاتيح ظاهرة');
+});
+
+await step('سحب المؤشر الزمني على المسطرة', async () => {
+  const rc = await page.$('#tlRuler');
+  const bb = await rc.boundingBox();
+  await page.mouse.click(bb.x + 150, bb.y + 12);
+  await page.waitForTimeout(300);
+  const t = await page.evaluate(() => window.__ctx.stage.time);
+  if (t < 0.3) throw new Error('المؤشر لم يتحرك: ' + t);
+});
+
+await step('تشغيل المعاينة (الزمن يتقدم)', async () => {
+  await page.click('#tlPlay');
+  await page.waitForTimeout(800);
+  const t = await page.evaluate(() => window.__ctx.timeline.time);
+  await page.click('#tlPlay');
+  if (!(t > 0.4)) throw new Error('الزمن ' + t);
+});
+
+await step('تغيير مدة المشهد', async () => {
+  await page.fill('#tlDur', '3');
+  await page.dispatchEvent('#tlDur', 'change');
+  await page.waitForTimeout(300);
+  const d = await page.evaluate(() => window.__ctx.ws().duration);
+  if (d !== 3) throw new Error('المدة ' + d);
+  await page.screenshot({ path: shots + 'shot-8-timeline.png' });
+});
+
+await step('زر تصدير الفيديو موجود', async () => {
+  const has = await page.$('#tlVideo');
+  if (!has) throw new Error('الزر غير موجود');
+});
+
+await step('دوران 360 بالسحب على الخلفية', async () => {
+  await page.mouse.move(200, 400);
+  await page.mouse.down();
+  await page.mouse.move(1100, 280, { steps: 25 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
   await page.screenshot({ path: shots + 'shot-3-rotated.png' });
 });
 
@@ -93,13 +183,6 @@ await step('تصدير PNG', async () => {
   await page.click('#mClose');
 });
 
-await step('إنشاء بيئة عمل جديدة والتبديل', async () => {
-  await page.click('#wsNew');
-  await page.waitForTimeout(400);
-  await page.click('#eTxt');
-  await page.waitForTimeout(400);
-});
-
 await step('الوضع الليلي', async () => {
   await page.click('#themeBtn');
   await page.waitForTimeout(400);
@@ -107,7 +190,7 @@ await step('الوضع الليلي', async () => {
   await page.click('#themeBtn');
 });
 
-await step('شاشة هاتف (موبايل)', async () => {
+await step('شاشة الهاتف', async () => {
   await page.setViewportSize({ width: 420, height: 860 });
   await page.waitForTimeout(700);
   await page.screenshot({ path: shots + 'shot-6-mobile.png' });
