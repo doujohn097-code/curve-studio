@@ -92,3 +92,7 @@ npx serve .        # أو: python3 -m http.server 8000
 MIT — انظر [LICENSE](LICENSE).
 
 </div>
+
+## 📦 نسخة بملف واحد
+
+جرّب الاستوديو فوراً دون أي تثبيت: افتح [`curve-studio-standalone.html`](curve-studio-standalone.html) مباشرة في المتصفح (يحتوي كل شيء: الكود + خطا Cairo وAmiri مضمّنين، ويعمل دون اتصال جزئياً — بقية الخطوط تحتاج اتصالاً من Google Fonts).
