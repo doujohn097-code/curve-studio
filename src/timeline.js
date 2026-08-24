@@ -2,7 +2,7 @@
 // مفاتيح Animation، قص/تمديد الطبقات، السرعة، التشغيل، وتصدير الفيديو
 import { icon } from './icons.js';
 import { esc, history } from './state.js';
-import { PROP_GROUPS, EASES, evalProp, upsertKey, delKeysAt, moveKeysAt, ensureAnim } from './anim.js';
+import { PROP_GROUPS, EASES, evalProp, upsertKey, delKeysAt, moveKeysAt, ensureAnim, ANIM_PRESETS } from './anim.js';
 
 const LCOL = 226;      // عرض عمود أسماء الطبقات
 const ROWH = 30;       // ارتفاع الصف
@@ -29,7 +29,10 @@ export function initTimeline(ctx) {
         <input type="number" id="tlDur" class="tsel mini" min="1" max="60" step="0.5" value="5" style="width:56px"> ث
       </div>
       <div class="tlgroup">
-        <button class="tbtn ${''}" id="tlAutoK" title="المفاتيح التلقائية: أي تعديل يُسجَّل مفتاحاً عند المؤشر الزمني">● مفاتيح تلقائية</button>
+        <button class="tbtn" id="tlAutoK" title="المفاتيح التلقائية: أي تعديل يُسجَّل مفتاحاً عند المؤشر الزمني">● مفاتيح تلقائية</button>
+      </div>
+      <div class="tlgroup">
+        <select id="tlPreset" class="tsel" title="انميشن جاهزة للطبقة المحددة">⚡ انميشن جاهزة…</select>
       </div>
       <div class="tlgroup">
         <select id="tlEase" class="tsel mini" disabled><option value="">تخفيف المفتاح…</option>${EASES.map(e => `<option value="${e[0]}">${e[1]}</option>`).join('')}</select>
@@ -170,7 +173,6 @@ export function initTimeline(ctx) {
       if (!id) return;
       row.addEventListener('click', e => {
         const t = e.target;
-        if (t.closest('.exp')) { t.classList.contains('exp') && 0; }
         if (t.closest('.eye')) { const el = ws.elements.find(x => x.id === id); el.visible = !el.visible; ctx.touch(el, true); return; }
         if (t.closest('.lk')) { const el = ws.elements.find(x => x.id === id); el.locked = !el.locked; ctx.touch(el, true); return; }
         if (t.closest('.spd')) return;
@@ -183,6 +185,30 @@ export function initTimeline(ctx) {
         if (e.target.closest('.lnm')) ctx.renameEl(id);
       });
     });
+    // سحب عمود الطبقة لإعادة الترتيب
+    inner.querySelectorAll('.trow.layer .lcol').forEach((lc, idx) => {
+      const row = lc.closest('.trow.layer');
+      if (!row.dataset.id) return;
+      lc.draggable = true;
+      lc.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ i: [...inner.querySelectorAll('.trow.layer[data-id]')].indexOf(row) }));
+        e.dataTransfer.effectAllowed = 'move';
+        lc.classList.add('dragging');
+      });
+      lc.addEventListener('dragend', () => lc.classList.remove('dragging'));
+      lc.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('dropover'); });
+      lc.addEventListener('dragleave', () => row.classList.remove('dropover'));
+      lc.addEventListener('drop', e => {
+        e.preventDefault(); row.classList.remove('dropover');
+        try {
+          const { i } = JSON.parse(e.dataTransfer.getData('text/plain'));
+          const to = [...inner.querySelectorAll('.trow.layer[data-id]')].indexOf(row);
+          const el = ctx.ws().elements[i];
+          if (el && to >= 0 && i !== to) ctx.moveLayer(el.id, to, 'index');
+        } catch (err) { }
+      });
+    });
+
     inner.querySelectorAll('.exp').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation();
       const id = b.dataset.id;
@@ -406,7 +432,7 @@ export function initTimeline(ctx) {
   }
   function updatePlayhead() {
     ph.style.left = (LCOL + time * px) + 'px';
-    timeLbl.textContent = time.toFixed(2) + ' / ' + ctx.ws().duration.toFixed(2) + 's';
+    timeLbl.textContent = time.toFixed(2) + ' / ' + (ctx.ws().duration ?? 5).toFixed(2) + 's';
     playBtn.textContent = playing ? '⏸' : '▶';
   }
   function setPlaying(p) {
@@ -444,6 +470,29 @@ export function initTimeline(ctx) {
     setTime(Math.min(time, ws.duration));
     refresh();
     ctx.scheduleSavePub();
+  };
+  const presetSel = dock.querySelector('#tlPreset');
+  presetSel.innerHTML = '<option value="">⚡ انميشن جاهزة…</option>' + ANIM_PRESETS.map(a => `<option value="${a.id}">${a.n}</option>`).join('');
+  presetSel.onchange = () => {
+    const id = presetSel.value;
+    presetSel.value = '';
+    if (!id) return;
+    const ws = ctx.ws();
+    const el = ws.elements.find(x => x.id === ctx.selectedId);
+    if (!el) { if (ctx.toastFn) ctx.toastFn('حدد طبقة أولاً ثم اختر الانميشن'); return; }
+    const pre = ANIM_PRESETS.find(a => a.id === id);
+    ensureAnim(el, ws.duration);
+    if (!pre.apply) {
+      el.anim.props = {}; // حذف كل المفاتيح
+    } else {
+      const map = pre.apply(el, ws, prop => evalProp(el, prop, 0, ws));
+      for (const [prop, keys] of Object.entries(map)) {
+        el.anim.props[prop] = { k: keys.map(([t, v]) => ({ t, v, e: 'io' })) };
+      }
+    }
+    ctx.touch(el, true);
+    expanded.add(el.id);
+    refresh();
   };
   dock.querySelector('#tlAutoK').onclick = e => {
     autoKey = !autoKey;

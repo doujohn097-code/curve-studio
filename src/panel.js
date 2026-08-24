@@ -162,6 +162,14 @@ export function renderPanel(ctx) {
     addRange(g, binds, el, ctx, 'دوران Z', 'rotZ', -180, 180, 1, '°');
     addRange(g, binds, el, ctx, 'الحجم', 'scale', 0.05, 3, 0.01, '×');
     addRange(g, binds, el, ctx, 'الشفافية', 'opacity', 0, 1, 0.01);
+    g.push(`<div class="pair centerbtns">
+      <button class="btn mini" id="pcCx" title="توسيط أفقي">${icon('fit')} توسيط أفقي</button>
+      <button class="btn mini" id="pcCy" title="توسيط عمودي">${icon('fit')} توسيط عمودي</button>
+    </div>`);
+    binds.push(() => {
+      root.querySelector('#pcCx').onclick = () => { ctx.setProp(el, 'x', 0); ctx.touch(el, true); };
+      root.querySelector('#pcCy').onclick = () => { ctx.setProp(el, 'y', 0); ctx.touch(el, true); };
+    });
     g.push(`<button class="btn wide" id="pcResetT">${icon('rotate')} تصفير التحويلات</button>`);
     binds.push(() => {
       root.querySelector('#pcResetT').onclick = () => {

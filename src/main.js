@@ -57,6 +57,7 @@ const ctx = {
   isPlaying: () => !!(timeline && timeline.playing),
   exportVideo,
   scheduleSavePub: () => scheduleSave(),
+  toastFn: m => ui.toast(m),
   get timeline() { return timeline; }
 };
 
@@ -609,6 +610,8 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (k === 'Delete' && timeline && timeline.selKf) { timeline.deleteSelKf(); return; }
+  if (k === 'PageUp' && el) { e.preventDefault(); moveLayer(el.id, Math.max(0, ws.elements.indexOf(el) - 1), 'index'); return; }
+  if (k === 'PageDown' && el) { e.preventDefault(); moveLayer(el.id, Math.min(ws.elements.length - 1, ws.elements.indexOf(el) + 1), 'index'); return; }
   if (!el) return;
   const sp = (prop, v) => setProp(el, prop, Math.round(v * 100) / 100);
   const step = e.shiftKey ? 8 : 1.5;

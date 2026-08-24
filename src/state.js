@@ -133,6 +133,12 @@ export const storage = {
       }
       state.workspaces = d.workspaces;
       state.activeId = d.activeId && state.workspaces.some(w => w.id === d.activeId) ? d.activeId : state.workspaces[0].id;
+      // توحيد الحقول بين الإصدارات
+      state.workspaces.forEach(w => {
+        if (!w.duration || !isFinite(w.duration)) w.duration = 5;
+        if (!w.bg) w.bg = { type: 'color', color: '#ffffff', from: '#ffffff', to: '#e9e9ec', angle: 135 };
+        w.elements = (w.elements || []).map(el => ({ ...el }));
+      });
       if (d.ui && d.ui.theme) state.ui.theme = d.ui.theme;
       return d;
     } catch (e) { return null; }

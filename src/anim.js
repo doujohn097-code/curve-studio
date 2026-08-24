@@ -103,3 +103,51 @@ export const PROP_GROUPS = [
   { id: 'bend', n: 'الانحناء', props: ['bendX', 'bendY'] },
   { id: 'twist', n: 'التواء وموجة', props: ['twist', 'waveAmp'] }
 ];
+
+/* انميشن جاهزة بضغطة واحدة (تُطبق على الطبقة المحددة) */
+export const ANIM_PRESETS = [
+  { id: 'none', n: 'بدون (حذف المفاتيح)', apply: null },
+  {
+    id: 'spin', n: 'دوران 360° كامل',
+    apply: (el, ws, ev) => ({ rotZ: [[0, ev('rotZ')], [ws.duration, ev('rotZ') + 360]] })
+  },
+  {
+    id: 'fadeIn', n: 'ظهور تدريجي',
+    apply: (el, ws, ev) => ({ opacity: [[0, 0], [Math.min(0.8, ws.duration / 3), 1]] })
+  },
+  {
+    id: 'flyIn', n: 'دخول من اليمين + ظهور',
+    apply: (el, ws, ev) => ({
+      x: [[0, ev('x') + 110], [Math.min(0.9, ws.duration / 3), ev('x')]],
+      opacity: [[0, 0], [Math.min(0.9, ws.duration / 3) / 2, 1]]
+    })
+  },
+  {
+    id: 'pulse', n: 'نبض (تكبير/تصغير)',
+    apply: (el, ws, ev) => {
+      const d = ws.duration, s0 = ev('scale');
+      return { scale: [[0, s0], [d * 0.5, s0 * 1.22], [d, s0]] };
+    }
+  },
+  {
+    id: 'sway', n: 'تمايل إمالة يمين/يسار',
+    apply: (el, ws, ev) => {
+      const d = ws.duration;
+      return { rotY: [[0, ev('rotY') - 22], [d * 0.5, ev('rotY') + 22], [d, ev('rotY') - 22]] };
+    }
+  },
+  {
+    id: 'float', n: 'طفو لأعلى وأسفل',
+    apply: (el, ws, ev) => {
+      const d = ws.duration;
+      return { y: [[0, ev('y')], [d * 0.5, ev('y') + 16], [d, ev('y')]] };
+    }
+  },
+  {
+    id: 'roll', n: 'لفة انحناء متحركة',
+    apply: (el, ws, ev) => {
+      const d = ws.duration;
+      return { bendX: [[0, ev('bendX') - 60], [d * 0.5, ev('bendX') + 60], [d, ev('bendX') - 60]] };
+    }
+  }
+];

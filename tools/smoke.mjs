@@ -162,6 +162,34 @@ await step('تغيير مدة المشهد', async () => {
   await page.screenshot({ path: shots + 'shot-8-timeline.png' });
 });
 
+await step('انميشن جاهز (دوران 360)', async () => {
+  await page.selectOption('#tlPreset', 'spin');
+  await page.waitForTimeout(400);
+  const keys = await page.evaluate(() => (window.__ctx.ws().elements[0].anim?.props?.rotZ?.k || []).length);
+  if (keys < 2) throw new Error('لم تُنشأ مفاتيح الدوران');
+});
+
+await step('إعادة ترتيب الطبقة (PageDown)', async () => {
+  const before = await page.evaluate(() => window.__ctx.ws().elements[0].name);
+  await page.click('.trow.layer[data-id] >> nth=0');
+  await page.keyboard.press('PageDown');
+  await page.waitForTimeout(300);
+  const front = await page.evaluate(() => window.__ctx.ws().elements[0].name);
+  if (front === before) throw new Error('لم يتغير الترتيب');
+  await page.keyboard.press('PageUp');
+  await page.waitForTimeout(200);
+});
+
+await step('الاستمرارية بعد إعادة التحميل', async () => {
+  await page.waitForTimeout(1200);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1800);
+  const n = await page.evaluate(() => window.__ctx.ws().elements.length);
+  if (n < 2) throw new Error('العناصر لم تُستعد بعد التحميل: ' + n);
+  const keys = await page.evaluate(() => Object.values(window.__ctx.ws().elements[0].anim?.props || {}).reduce((a, p) => a + p.k.length, 0));
+  if (keys < 2) throw new Error('المفاتيح لم تُستعد');
+});
+
 await step('زر تصدير الفيديو موجود', async () => {
   const has = await page.$('#tlVideo');
   if (!has) throw new Error('الزر غير موجود');

@@ -490,3 +490,10 @@ html[data-theme='dark'] #gizmo .gzh.r { background: #fff; }
   #toasts { bottom: 226px; }
 }
 #dock.collapsed ~ #toasts, body:has(#dock.collapsed) #toasts { bottom: 60px; }
+
+/* سحب ترتيب الطبقات */
+.trow.layer .lcol { cursor: grab; }
+.trow.layer .lcol.dragging { opacity: .45; }
+.trow.layer.dropover { box-shadow: inset 0 2px 0 var(--fg); }
+.centerbtns { margin: 6px 0; }
+.centerbtns .btn { flex: 1; }
