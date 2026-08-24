@@ -1,0 +1,18 @@
+{
+  "name": "curve-studio",
+  "version": "1.0.0",
+  "description": "استوديو 3D في المتصفح — صورتك كبطاقة/شاشة منحنية قابلة للدوران 360° مع نصوص عربية/إنجليزية وطبقات كاملة | 3D curved image & text studio",
+  "main": "index.html",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --format=iife --outfile=js/app.bundle.js",
+    "build:watch": "esbuild src/main.js --bundle --minify --format=iife --outfile=js/app.bundle.js --watch",
+    "standalone": "node tools/build-standalone.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  }
+}

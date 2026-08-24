@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>استوديو الانحناء — Curve Studio 3D</title>
+<meta name="description" content="استوديو 3D في المتصفح: اعرض صورتك كبطاقة منحنية قابلة للدوران 360°، أضف نصوصاً بعشرات الخطوط العربية والإنجليزية، تحكم كامل بالحواف والخلفية والطبقات، واحفظ النتيجة PNG.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230b0b0c'/%3E%3Cpath d='M5 7c5-3 9 3 14 0v10c-5 3-9-3-14 0z' fill='none' stroke='white' stroke-width='1.7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700&family=Almarai:wght@400;700;800&family=Amiri:wght@400;700&family=Changa:wght@400;700&family=El+Messiri:wght@400;700&family=Reem+Kufi:wght@400;700&family=Markazi+Text:wght@400;700&family=Noto+Kufi+Arabic:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Noto+Sans+Arabic:wght@400;700&family=Mada:wght@400;700&family=Scheherazade+New:wght@400;700&family=Aref+Ruqaa:wght@400;700&family=Lateef:wght@400;700&family=Alexandria:wght@400;700&family=Baloo+Bhaijaan+2:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;700&family=Marhey:wght@400;700&family=Readex+Pro:wght@400;700&family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rakkas&family=Lalezar&family=Katibeh&family=Jomhuria&family=Qahiri&family=Blaka&family=Gulzar&family=Vibes&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Poppins:wght@400;700&family=Montserrat:wght@400;700&family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Oswald:wght@400;700&family=Bebas+Neue&family=Anton&family=Lobster&family=Pacifico&family=Dancing+Script:wght@400;700&family=Merriweather:wght@400;700&family=Raleway:wght@400;700&family=Jost:wght@400;700&family=Space+Mono:wght@400;700&family=Caveat:wght@400;700&family=Archivo+Black&family=Abril+Fatface&family=Cinzel:wght@400;700&family=Great+Vibes&family=Righteous&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar"></header>
+  <div id="mid">
+    <nav id="toolrail"></nav>
+    <div id="stage">
+      <div id="frame"></div>
+      <canvas id="gl"></canvas>
+      <div id="empty" class="hidden"></div>
+      <div id="hint"></div>
+    </div>
+    <aside id="panel"></aside>
+  </div>
+  <footer id="bar">
+    <div id="barLeft"></div>
+    <div id="chips"></div>
+    <div id="barRight"></div>
+  </footer>
+</div>
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+<div id="modals"></div>
+<div id="toasts"></div>
+<script>
+/* ثيم مبكر لتفادي الوميض (مع حماية من وضع المعاينة المقيد) */
+try {
+  var t = JSON.parse(localStorage.getItem('curve-studio.v1') || 'null');
+  if (t && t.ui && t.ui.theme === 'dark') document.documentElement.dataset.theme = 'dark';
+} catch (e) { }
+</script>
+<script src="js/app.bundle.js"></script>
+</body>
+</html>
